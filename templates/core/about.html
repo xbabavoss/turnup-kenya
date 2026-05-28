@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}About us | {{ settings.site_name }}{% endblock %}
+
+{% block body %}
+<div class="about-page-minimal">
+
+  <section class="about-hero-minimal">
+    <div class="about-hero-minimal-bg about-hero-minimal-bg-default"></div>
+    <div class="about-hero-minimal-overlay"></div>
+    <div class="page-wrap about-hero-minimal-content">
+      <h1 class="font-display">About us</h1>
+      <p>{{ settings.site_name }} makes it simple to discover events and get in with M-Pesa. Instant QR tickets, no account required.</p>
+    </div>
+  </section>
+
+  <section class="page-wrap about-vision-minimal">
+    <div class="about-vision-minimal-grid">
+      <h2 class="font-display">Empowering access to live experiences across Kenya.</h2>
+      <div>
+        <p class="about-label">OUR VISION</p>
+        <p class="text-muted">Every great night out should be one tap away, fair for fans and sustainable for organizers.</p>
+        <p class="about-label" style="margin-top: 1.5rem;">OUR MISSION</p>
+        <p class="text-muted">Fast, trusted ticketing with local payments and digital passes that work at the door.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-wrap" style="padding-bottom: 4rem;">
+    <div class="about-process-minimal">
+      <ol>
+        <li><span>01</span><div><strong>Discover</strong><p>Browse events by city and category.</p></div></li>
+        <li><span>02</span><div><strong>Pay with M-Pesa</strong><p>Enter phone and email. No signup.</p></div></li>
+        <li><span>03</span><div><strong>Get your QR</strong><p>Ticket in your inbox in seconds.</p></div></li>
+        <li><span>04</span><div><strong>Walk in</strong><p>One scan at the door.</p></div></li>
+      </ol>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

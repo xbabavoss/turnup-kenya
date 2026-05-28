@@ -1,0 +1,37 @@
+<header class="site-header">
+  <div class="site-header-inner">
+    <a href="{% url 'home' %}" class="brand-link">
+      {% if settings.logo_url %}
+      <img src="{{ site.logo.url }}" alt="{{ settings.site_name }}" class="brand-logo">
+      {% else %}
+      <span class="brand-mark">T</span>
+      {% endif %}
+      <span class="brand-name">{{ settings.site_name }}</span>
+    </a>
+
+    <nav class="nav-desktop" aria-label="Main">
+      <a href="{% url 'home' %}" class="nav-link {% if nav_path == '/' %}active{% endif %}">Home</a>
+      <a href="{% url 'event_list' %}" class="nav-link {% if '/events' in nav_path %}active{% endif %}">Events</a>
+      <a href="{% url 'about' %}" class="nav-link {% if '/about' in nav_path %}active{% endif %}">About</a>
+    </nav>
+
+    <div class="header-actions">
+      {% if user.is_staff %}
+      <a href="{% url 'portal_dashboard' %}" class="btn btn-ghost">Portal</a>
+      {% endif %}
+      <a href="{% url 'event_list' %}" class="btn btn-brand">Browse events</a>
+    </div>
+
+    <button type="button" class="menu-toggle" aria-label="Open menu" data-menu-toggle>
+      <i class="fa-solid fa-bars" data-icon-menu></i>
+      <i class="fa-solid fa-xmark hidden" data-icon-close></i>
+    </button>
+  </div>
+
+  <nav class="mobile-nav" data-mobile-nav aria-label="Mobile">
+    <a href="{% url 'home' %}">Home</a>
+    <a href="{% url 'event_list' %}">Events</a>
+    <a href="{% url 'about' %}">About</a>
+    {% if user.is_staff %}<a href="{% url 'portal_dashboard' %}">Portal</a>{% endif %}
+  </nav>
+</header>

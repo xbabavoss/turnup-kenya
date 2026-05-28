@@ -1,0 +1,45 @@
+{% load event_extras %}
+<article class="event-card fade-up" data-event-slug="{{ event.slug }}">
+  <div class="event-card-media">
+    {% if event|event_image %}
+    <img src="{{ event|event_image }}" alt="{{ event.title }}" loading="lazy">
+    {% else %}
+    <div class="event-card-media-placeholder"></div>
+    {% endif %}
+    {% if event|is_sold_out %}
+    <span class="sold-out-badge"><i class="fa-solid fa-ban"></i> Sold out</span>
+    {% endif %}
+  </div>
+  <div class="event-card-body">
+    <span class="event-card-category">{{ event.category|default:"Nightlife" }}</span>
+    <h3>{{ event.title }}</h3>
+    <div class="event-meta">
+      <span><i class="fa-regular fa-calendar"></i> {{ event.starts_at|date:"D, M j · g:i A" }}</span>
+      <span><i class="fa-solid fa-location-dot"></i> {{ event.venue }}, {{ event.location }}</span>
+      <span class="event-slots"><i class="fa-solid fa-ticket"></i> {{ event|event_slots }} slots left</span>
+    </div>
+    <div class="event-card-footer">
+      <span class="event-price">KES {% event_min_price event %} <small>from</small></span>
+      <div class="event-card-actions">
+        <a href="{% url 'event_detail' event.slug %}" class="btn btn-outline btn-sm">
+          <i class="fa-regular fa-eye"></i> View event
+        </a>
+        {% if event|is_sold_out %}
+        <button type="button" class="btn btn-brand btn-sm" disabled><i class="fa-solid fa-ban"></i> Sold out</button>
+        {% else %}
+        <button
+          type="button"
+          class="btn btn-brand btn-sm"
+          data-buy-open
+          data-slug="{{ event.slug }}"
+          data-title="{{ event.title }}"
+          data-price="{% event_min_price event %}"
+          data-can-buy="1"
+        >
+          <i class="fa-solid fa-ticket"></i> Buy
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</article>

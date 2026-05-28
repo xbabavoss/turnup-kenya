@@ -1,0 +1,51 @@
+{% extends 'portal/base.html' %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="portal-stats">
+  <div class="portal-stat"><label>Revenue</label><strong>KES {{ revenue|floatformat:0 }}</strong></div>
+  <div class="portal-stat"><label>Tickets sold</label><strong>{{ tickets_count }}</strong></div>
+  <div class="portal-stat"><label>Events</label><strong>{{ events_count }}</strong></div>
+  <div class="portal-stat"><label>Customers</label><strong>{{ customers_count }}</strong></div>
+</div>
+
+<div style="display: grid; gap: 1.25rem;">
+  <div class="portal-card">
+    <h2 style="margin:0 0 1rem;">Revenue by event</h2>
+    <table class="portal-table">
+      <thead><tr><th>Event</th><th>Tickets</th><th>Revenue</th></tr></thead>
+      <tbody>
+        {% for row in sales_by_event %}
+        <tr>
+          <td>{{ row.event__title }}</td>
+          <td>{{ row.count }}</td>
+          <td>KES {{ row.revenue|floatformat:0 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-muted">No sales yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="portal-card">
+    <h2 style="margin:0 0 1rem;">Recent sales</h2>
+    <table class="portal-table">
+      <thead><tr><th>Phone</th><th>Email</th><th>Event</th><th>Amount</th><th>Date</th></tr></thead>
+      <tbody>
+        {% for t in recent_tickets %}
+        <tr>
+          <td>{{ t.customer.phone }}</td>
+          <td>{{ t.customer.email }}</td>
+          <td>{{ t.event.title }}</td>
+          <td>KES {{ t.total_price|floatformat:0 }}</td>
+          <td>{{ t.created_at|date:"M j, H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-muted">No tickets yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

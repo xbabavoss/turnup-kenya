@@ -1,0 +1,34 @@
+{% extends 'portal/base.html' %}
+{% block page_title %}Customers{% endblock %}
+{% block content %}
+
+<div class="portal-card">
+  <p class="text-muted" style="margin: 0 0 1rem; font-size: 0.875rem;">Customers are uniquely identified by phone number.</p>
+  <table class="portal-table">
+    <thead>
+      <tr>
+        <th>Phone</th>
+        <th>Email</th>
+        <th>Name</th>
+        <th>Tickets</th>
+        <th>Total spent</th>
+        <th>Joined</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in customers %}
+      <tr>
+        <td><strong>{{ c.phone }}</strong></td>
+        <td>{{ c.email }}</td>
+        <td>{{ c.full_name|default:"-" }}</td>
+        <td>{{ c.ticket_count }}</td>
+        <td>KES {{ c.total_spent|default:0|floatformat:0 }}</td>
+        <td>{{ c.created_at|date:"M j, Y" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-muted">No customers yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load event_extras %}
+{% block title %}{{ event.title }} | {{ settings.site_name }}{% endblock %}
+{% block content %}
+<div class="page-wrap event-detail-page">
+
+  <div class="event-detail-hero fade-up">
+    {% if event|event_image %}
+    <img src="{{ event|event_image }}" alt="{{ event.title }}">
+    {% else %}
+    <div class="event-detail-hero-placeholder"></div>
+    {% endif %}
+    {% if event|is_sold_out %}
+    <span class="sold-out-badge" style="top: 1.25rem; right: 1.25rem;"><i class="fa-solid fa-ban"></i> Sold out</span>
+    {% endif %}
+    <div class="event-detail-hero-overlay">
+      <span class="event-detail-status">{{ event.get_status_display }}</span>
+      <h1 class="font-display">{{ event.title }}</h1>
+      <p><i class="fa-solid fa-location-dot"></i> {{ event.venue }}, {{ event.location }}</p>
+    </div>
+  </div>
+
+  <div class="event-detail-layout">
+    <div class="event-detail-main">
+      <div class="surface-card detail-block">
+        <h2 class="font-display">About this event</h2>
+        <p class="text-muted detail-desc">{{ event.description }}</p>
+        <div class="detail-facts">
+          <div>
+            <p class="detail-label">Date</p>
+            <p><i class="fa-regular fa-calendar text-primary"></i> {{ event.starts_at|date:"l, F j · g:i A" }}</p>
+          </div>
+          <div>
+            <p class="detail-label">Slots left</p>
+            <p><i class="fa-solid fa-ticket text-primary"></i> {{ event|event_slots }}</p>
+          </div>
+          <div>
+            <p class="detail-label">Category</p>
+            <p>{{ event.category|default:"Nightlife" }}</p>
+          </div>
+        </div>
+      </div>
+
+      {% if event.lineup %}
+      <div class="surface-card detail-block">
+        <h2 class="font-display">Lineup</h2>
+        <div class="lineup-tags">
+          {% for artist in event.lineup|split_lineup %}
+          <span>{{ artist }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <aside class="surface-card detail-sidebar">
+      <p class="text-muted" style="font-size: 0.875rem; margin: 0;">From</p>
+      <p class="font-display detail-price">KES {% event_min_price event %}</p>
+      <p class="text-muted detail-note"><i class="fa-solid fa-qrcode"></i> Instant QR, PDF and email</p>
+
+      {% if event|is_sold_out %}
+      <button class="btn btn-outline" style="width: 100%;" disabled><i class="fa-solid fa-ban"></i> Sold out</button>
+      {% else %}
+      <button
+        type="button"
+        class="btn btn-brand"
+        style="width: 100%;"
+        data-buy-open
+        data-slug="{{ event.slug }}"
+        data-title="{{ event.title }}"
+        data-price="{% event_min_price event %}"
+        data-can-buy="1"
+      >
+        <i class="fa-solid fa-ticket"></i> Buy tickets
+      </button>
+      <a href="{% url 'event_list' %}" class="btn btn-ghost" style="width: 100%; margin-top: 0.5rem; text-align: center;">Back to events</a>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

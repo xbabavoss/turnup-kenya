@@ -1,0 +1,80 @@
+{% extends 'portal/base.html' %}
+{% block page_title %}Site settings{% endblock %}
+{% block content %}
+
+<div class="portal-settings-tabs">
+  <a href="{% url 'portal_settings' %}" class="portal-tab active">Site settings</a>
+  <a href="{% url 'portal_payments' %}" class="portal-tab">Payments</a>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="portal-settings-form">
+  {% csrf_token %}
+
+  <div class="portal-form-section">
+    <h3>Brand</h3>
+    <div class="portal-form-grid">
+      {% for field in form %}
+        {% if field.name in 'site_name,tagline,logo,favicon,hero_image' %}
+        <div class="form-row {% if field.name == 'tagline' %}span-2{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}<span class="form-error">{{ field.errors.0 }}</span>{% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <div class="image-preview-wrap">
+      <p class="text-muted" style="font-size:0.75rem; margin:0 0 0.35rem;">Logo preview (header &amp; social cards)</p>
+      <img src="{% if site.logo %}{{ site.logo.url }}{% endif %}" alt="Logo" id="site-logo-preview" class="image-preview logo-preview-box" {% if not site.logo %}style="display:none;"{% endif %}>
+      <p class="text-muted" style="font-size:0.75rem; margin:1rem 0 0.35rem;">Favicon preview (browser tab icon)</p>
+      <img src="{% if site.favicon %}{{ site.favicon.url }}{% endif %}" alt="Favicon" id="site-favicon-preview" class="image-preview favicon-preview-box" {% if not site.favicon %}style="display:none;"{% endif %}>
+      <p class="text-muted" style="font-size:0.75rem; margin:1rem 0 0.35rem;">Home hero image preview</p>
+      <img src="{% if site.hero_image %}{{ site.hero_image.url }}{% endif %}" alt="Hero" id="site-hero-preview" class="image-preview hero-preview-box" {% if not site.hero_image %}style="display:none;"{% endif %}>
+    </div>
+  </div>
+
+  <div class="portal-form-section">
+    <h3>Contact</h3>
+    <div class="portal-form-grid">
+      {% for field in form %}
+        {% if field.name in 'support_email,support_phone,paybill' %}
+        <div class="form-row">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="portal-form-section">
+    <h3>Social links</h3>
+    <div class="portal-form-grid">
+      {% for field in form %}
+        {% if field.name in 'instagram_url,twitter_url,facebook_url,youtube_url' %}
+        <div class="form-row">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="portal-form-section">
+    <h3>SEO</h3>
+    <div class="portal-form-grid">
+      {% for field in form %}
+        {% if field.name in 'meta_description,meta_keywords' %}
+        <div class="form-row span-2">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-brand">Save settings</button>
+</form>
+{% endblock %}

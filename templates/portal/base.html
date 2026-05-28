@@ -1,0 +1,55 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Portal{% endblock %} | {{ settings.site_name }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <link rel="stylesheet" href="{% static 'css/portal.css' %}">
+</head>
+<body class="portal-body">
+  <div class="portal-layout">
+    <aside class="portal-sidebar">
+      <a href="{% url 'portal_dashboard' %}" class="portal-brand">
+        {% if site.logo %}
+        <img src="{{ site.logo.url }}" alt="" class="brand-logo">
+        {% else %}
+        <span class="brand-mark">T</span>
+        {% endif %}
+        <span>Portal</span>
+      </a>
+      <nav class="portal-nav">
+        <a href="{% url 'portal_dashboard' %}" class="{% if request.path == '/portal/' %}active{% endif %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+        <a href="{% url 'portal_events' %}" class="{% if '/portal/events' in request.path %}active{% endif %}"><i class="fa-solid fa-calendar-days"></i> Events</a>
+        <a href="{% url 'portal_tickets' %}" class="{% if '/portal/tickets' in request.path %}active{% endif %}"><i class="fa-solid fa-ticket"></i> Tickets</a>
+        <a href="{% url 'portal_customers' %}" class="{% if '/portal/customers' in request.path %}active{% endif %}"><i class="fa-solid fa-users"></i> Customers</a>
+        <a href="{% url 'portal_settings' %}" class="{% if request.path == '/portal/settings/' %}active{% endif %}"><i class="fa-solid fa-gear"></i> Site settings</a>
+        <a href="{% url 'portal_payments' %}" class="{% if '/portal/settings/payments' in request.path %}active{% endif %}"><i class="fa-solid fa-credit-card"></i> Payments</a>
+      </nav>
+      <div class="portal-sidebar-foot">
+        <a href="{% url 'home' %}" class="portal-link-muted"><i class="fa-solid fa-arrow-up-right-from-square"></i> View site</a>
+        <a href="{% url 'portal_logout' %}" class="portal-link-muted"><i class="fa-solid fa-right-from-bracket"></i> Log out</a>
+      </div>
+    </aside>
+    <div class="portal-main">
+      <header class="portal-topbar">
+        <h1 class="portal-page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+        <span class="text-muted" style="font-size: 0.875rem;">{{ request.user.get_username }}</span>
+      </header>
+      {% if messages %}
+      <div class="portal-messages">
+        {% for message in messages %}<div class="alert alert-info">{{ message }}</div>{% endfor %}
+      </div>
+      {% endif %}
+      <div class="portal-content">
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+  <script src="{% static 'js/portal.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

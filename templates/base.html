@@ -1,0 +1,64 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ settings.site_name }}{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ settings.meta_description }}{% endblock %}">
+  <meta name="keywords" content="{% block meta_keywords %}{{ settings.meta_keywords }}{% endblock %}">
+  <meta name="author" content="{{ settings.site_name }}">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ settings.site_name }}">
+  <meta property="og:title" content="{% block og_title %}{{ settings.site_name }}{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}{{ settings.meta_description }}{% endblock %}">
+  {% if settings.og_image %}<meta property="og:image" content="{{ settings.og_image }}">{% endif %}
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{% block twitter_title %}{{ settings.site_name }}{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}{{ settings.meta_description }}{% endblock %}">
+  {% if settings.og_image %}<meta name="twitter:image" content="{{ settings.og_image }}">{% endif %}
+
+  {% if settings.favicon_url %}
+  <link rel="icon" href="{{ settings.favicon_url }}">
+  <link rel="apple-touch-icon" href="{{ settings.favicon_url }}">
+  {% endif %}
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="site">
+
+  {% block header %}
+  {% include 'partials/site_header.html' %}
+  {% endblock %}
+
+  {% if messages %}
+  <div class="page-wrap messages-wrap">
+    {% for message in messages %}
+    <div class="alert alert-info">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% block body %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  {% endblock %}
+
+  {% include 'partials/purchase_modal.html' %}
+
+  {% block footer %}
+  {% include 'partials/site_footer.html' %}
+  {% endblock %}
+
+  <script src="{% static 'js/main.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

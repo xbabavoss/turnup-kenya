@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Turn Up Kenya · Event tickets{% endblock %}
+{% block meta_description %}Book tickets to concerts, sports, tech and culture events across Kenya.{% endblock %}
+
+{% block header %}{% endblock %}
+
+{% block body %}
+<div class="flex flex-col" style="flex: 1;">
+
+  <div class="landing-shell">
+    {% include 'partials/site_header.html' %}
+
+    <section class="hero-landing">
+      <div class="hero-full-bg{% if not hero_image %} hero-full-bg-default{% endif %}"{% if hero_image %} style="background-image: url('{{ hero_image }}');"{% endif %}></div>
+      <div class="hero-full-overlay"></div>
+      <div class="hero-full-grid"></div>
+
+      <div class="hero-landing-content">
+
+        <h1 class="hero-title font-display">
+          The nights you'll <span class="text-gradient">remember</span>, one tap away.
+        </h1>
+
+        <p class="hero-lead">
+          Discover concerts, conferences, comedy and culture. Pay with M-Pesa.
+          Get your ticket on your phone in seconds.
+        </p>
+
+        <div class="hero-actions">
+          <a href="{% url 'event_list' %}" class="btn btn-brand btn-lg">
+            Browse events <i class="fa-solid fa-arrow-right"></i>
+          </a>
+          <a href="{% url 'about' %}" class="btn btn-outline btn-lg">How it works</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="page-section">
+    <div class="section-header">
+      <div>
+        <p class="text-primary" style="font-size: 0.875rem; margin: 0;">Featured</p>
+        <h2 class="font-display">This week's hottest tickets</h2>
+      </div>
+      <a href="{% url 'event_list' %}" class="text-muted" style="font-size: 0.875rem;">View all</a>
+    </div>
+    {% if featured_events %}
+    <div class="events-grid events-grid-3">
+      {% for event in featured_events %}
+        {% include 'partials/event_card.html' %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state surface-card">
+      <p class="font-display" style="margin:0;">No upcoming events yet.</p>
+      <p class="text-muted" style="margin-top:0.5rem;font-size:0.875rem;">Check back soon or list an event in the portal.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="value-section">
+    <div class="value-grid">
+      <div class="value-card fade-up">
+        <div class="value-icon"><i class="fa-solid fa-bolt"></i></div>
+        <h3 class="font-display">Instant tickets</h3>
+        <p>STK push to your phone. Ticket in your inbox before the song ends.</p>
+      </div>
+      <div class="value-card fade-up">
+        <div class="value-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <h3 class="font-display">Verified events</h3>
+        <p>Every organizer is vetted. Every ticket has a unique QR code.</p>
+      </div>
+      <div class="value-card fade-up">
+        <div class="value-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+        <h3 class="font-display">Curated for you</h3>
+        <p>Hand-picked events across music, sport, tech, comedy and culture.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section" style="padding-top: 0;">
+    <div class="cta-band">
+      <div class="cta-band-grid"></div>
+      <div class="cta-band-body">
+        <h2 class="font-display">Hosting an event? <span class="text-gradient">List it in minutes.</span></h2>
+        <p>Powerful organizer tools, real-time sales, instant payouts.</p>
+      </div>
+      <a href="{% url 'portal_login' %}" class="btn btn-brand btn-lg" style="position: relative; flex-shrink: 0;">Organizer portal</a>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

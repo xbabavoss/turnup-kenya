@@ -1,0 +1,42 @@
+{% extends 'portal/base.html' %}
+{% block page_title %}Tickets{% endblock %}
+{% block content %}
+
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+  <a href="{% url 'portal_tickets' %}" class="pill-btn {% if not active_status %}active{% endif %}">All</a>
+  <a href="{% url 'portal_tickets' %}?status=paid" class="pill-btn {% if active_status == 'paid' %}active{% endif %}">Paid</a>
+  <a href="{% url 'portal_tickets' %}?status=pending" class="pill-btn {% if active_status == 'pending' %}active{% endif %}">Pending</a>
+  <a href="{% url 'portal_tickets' %}?status=used" class="pill-btn {% if active_status == 'used' %}active{% endif %}">Used</a>
+</div>
+
+<div class="portal-card">
+  <table class="portal-table">
+    <thead>
+      <tr>
+        <th>Ticket ID</th>
+        <th>Phone</th>
+        <th>Email</th>
+        <th>Event</th>
+        <th>Qty</th>
+        <th>Amount</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tickets %}
+      <tr>
+        <td style="font-family: monospace; font-size: 0.75rem;">{{ t.ticket_id|truncatechars:12 }}</td>
+        <td>{{ t.customer.phone }}</td>
+        <td>{{ t.attendee_email }}</td>
+        <td>{{ t.event.title }}</td>
+        <td>{{ t.quantity }}</td>
+        <td>KES {{ t.total_price|floatformat:0 }}</td>
+        <td>{{ t.get_status_display }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="text-muted">No tickets found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

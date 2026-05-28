@@ -1,0 +1,39 @@
+<footer class="site-footer">
+  <div class="site-footer-grid">
+    <div class="site-footer-brand">
+      <div class="brand-link">
+        {% if site.logo %}
+        <img src="{{ site.logo.url }}" alt="{{ settings.site_name }}" class="brand-logo">
+        {% else %}
+        <span class="brand-mark">T</span>
+        {% endif %}
+        <span class="brand-name">{{ settings.site_name }}</span>
+      </div>
+      <p class="text-muted" style="max-width: 28rem; margin-top: 0.75rem; font-size: 0.875rem; line-height: 1.6;">{{ settings.tagline }}</p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="{% url 'event_list' %}">Events</a></li>
+        <li><a href="{% url 'about' %}">About</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Support</h4>
+      <ul>
+        <li>{{ settings.support_email }}</li>
+        <li>{{ settings.support_phone }}</li>
+        <li>Paybill {{ settings.paybill }}</li>
+      </ul>
+      <div class="social-links">
+        {% if settings.instagram_url %}<a href="{{ settings.instagram_url }}" aria-label="Instagram" target="_blank" rel="noopener"><i class="fa-brands fa-instagram"></i></a>{% endif %}
+        {% if settings.twitter_url %}<a href="{{ settings.twitter_url }}" aria-label="Twitter" target="_blank" rel="noopener"><i class="fa-brands fa-x-twitter"></i></a>{% endif %}
+        {% if settings.facebook_url %}<a href="{{ settings.facebook_url }}" aria-label="Facebook" target="_blank" rel="noopener"><i class="fa-brands fa-facebook"></i></a>{% endif %}
+        {% if settings.youtube_url %}<a href="{{ settings.youtube_url }}" aria-label="Youtube" target="_blank" rel="noopener"><i class="fa-brands fa-youtube"></i></a>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="site-footer-bottom">
+    © {% now "Y" %} {{ settings.site_name }}. All rights reserved.
+  </div>
+</footer>

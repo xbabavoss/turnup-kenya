@@ -1,0 +1,8 @@
+<div class="form-row">
+  {% if field.label %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{% endif %}
+  {{ field }}
+  {% if field.errors %}
+    {% for error in field.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+  {% endif %}
+  {% if field.help_text %}<p class="text-xs text-slate-500 mt-1">{{ field.help_text }}</p>{% endif %}
+</div>

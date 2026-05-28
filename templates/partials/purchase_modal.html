@@ -1,0 +1,55 @@
+<div class="modal-overlay hidden" id="purchase-modal" aria-hidden="true">
+  <div class="modal-backdrop" data-modal-close></div>
+  <div class="modal-panel" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+    <button type="button" class="modal-close" data-modal-close aria-label="Close">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <h2 id="modal-title" class="font-display modal-title">Complete payment</h2>
+    <p class="text-muted modal-event-name" id="modal-event-name"></p>
+    <p class="modal-price-line">From <strong id="modal-event-price">KES 0</strong></p>
+
+    <form method="post" id="purchase-form" class="modal-form">
+      {% csrf_token %}
+      <input type="hidden" name="quantity" value="1">
+      <div class="form-row">
+        <label for="purchase-email">Email</label>
+        <input type="email" name="email" id="purchase-email" class="np-input" placeholder="you@email.com" required>
+      </div>
+      <div class="form-row">
+        <label for="purchase-phone">M-Pesa phone number</label>
+        <input type="tel" name="mpesa_phone" id="purchase-phone" class="np-input" placeholder="07XX XXX XXX" required>
+      </div>
+      <div class="form-row">
+        <label for="purchase-name">Name on ticket <span class="text-muted">(optional)</span></label>
+        <input type="text" name="full_name" id="purchase-name" class="np-input" placeholder="Your name">
+      </div>
+      <p class="text-muted" style="font-size: 0.8rem; margin: 0;">No account needed. We send your ticket by email instantly.</p>
+      <button type="submit" class="btn btn-brand btn-lg" id="purchase-submit-btn" style="width: 100%; margin-top: 1rem;">
+        <i class="fa-solid fa-mobile-screen-button"></i> Complete payment
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="payment-overlay hidden" id="payment-loading-overlay" aria-hidden="true">
+  <div class="payment-overlay-panel">
+    <div class="payment-spinner" aria-hidden="true"></div>
+    <p class="payment-overlay-title">Processing payment</p>
+    <p class="payment-overlay-text" id="payment-loading-message">Check your phone for the M-Pesa prompt and enter your PIN.</p>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="payment-result-modal" aria-hidden="true">
+  <div class="modal-backdrop" data-payment-result-close></div>
+  <div class="modal-panel payment-result-panel" role="dialog" aria-modal="true">
+    <div class="payment-result-icon success hidden" id="payment-result-success-icon">
+      <i class="fa-solid fa-circle-check"></i>
+    </div>
+    <div class="payment-result-icon error hidden" id="payment-result-error-icon">
+      <i class="fa-solid fa-circle-xmark"></i>
+    </div>
+    <h2 class="font-display modal-title" id="payment-result-title">Payment successful</h2>
+    <p class="text-muted" id="payment-result-message"></p>
+    <button type="button" class="btn btn-brand btn-lg" id="payment-result-btn" style="width:100%; margin-top:1.25rem;">Continue</button>
+  </div>
+</div>

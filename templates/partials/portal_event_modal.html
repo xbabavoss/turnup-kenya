@@ -1,0 +1,29 @@
+<div class="modal-overlay hidden" id="portal-event-modal" aria-hidden="true">
+  <div class="modal-backdrop" data-portal-modal-close></div>
+  <div class="modal-panel portal-modal-panel" role="dialog" aria-modal="true">
+    <button type="button" class="modal-close" data-portal-modal-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    <h2 class="font-display modal-title" id="portal-event-modal-title">Add event</h2>
+
+    <form method="post" action="{% url 'portal_event_save' %}" enctype="multipart/form-data" id="portal-event-form">
+      {% csrf_token %}
+      <input type="hidden" name="event_id" id="portal-event-id" value="">
+
+      <div class="portal-modal-grid">
+        {% for field in event_form %}
+        <div class="form-row {% if field.name == 'description' or field.name == 'poster' %}span-2{% endif %}">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}<span class="form-error">{{ field.errors.0 }}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="image-preview-wrap" id="event-poster-preview-wrap" style="display:none;">
+        <p class="text-muted" style="font-size:0.75rem; margin:0 0 0.35rem;">Poster preview</p>
+        <img src="" alt="" id="event-poster-preview" class="image-preview">
+      </div>
+
+      <button type="submit" class="btn btn-brand" style="width:100%; margin-top:1rem;">Save event</button>
+    </form>
+  </div>
+</div>
