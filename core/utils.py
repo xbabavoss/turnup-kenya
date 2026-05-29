@@ -19,8 +19,13 @@ _logger = logging.getLogger(__name__)
 PDF_W, PDF_H = letter
 
 
-def generate_payment_reference(prefix="TXN"):
-    return f"{prefix}-{uuid4().hex[:12].upper()}"
+def generate_payment_reference(prefix="TXN", max_length=12):
+    """Generate a reference; default max 12 chars for M-Pesa accountReference."""
+    prefix = (prefix or "TXN")[:max_length]
+    room = max_length - len(prefix)
+    if room <= 0:
+        return prefix[:max_length]
+    return f"{prefix}{uuid4().hex[:room].upper()}"
 
 
 def build_qr_payload(ticket):

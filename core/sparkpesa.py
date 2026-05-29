@@ -1,4 +1,4 @@
-"""SparkPesa M-Pesa STK Push (request-payment) and wallet polling."""
+"""SparkPesa M-Pesa STK Push (request-payment) and webhook handling."""
 
 from __future__ import annotations
 
@@ -6,13 +6,17 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 import time
 from decimal import Decimal
 from typing import Any
+
 import requests
 from django.conf import settings
 
 _logger = logging.getLogger(__name__)
+
+MPESA_ACCOUNT_REF_MAX = 12
 
 
 class SparkPesaError(Exception):
@@ -57,17 +61,61 @@ def _wallet_id() -> str:
     return _strip_env(getattr(settings, "SPARKPESA_WALLET_ID", ""))
 
 
+def _ensure_https_url(url: str) -> str:
+    url = (url or "").strip()
+    if url.startswith("http://"):
+        return "https://" + url[len("http://") :]
+    return url
+
+
 def resolve_sparkpesa_webhook_url() -> str:
     """Public webhook URL (trailing slash for Django APPEND_SLASH)."""
     explicit = _strip_env(getattr(settings, "SPARKPESA_WEBHOOK_URL", ""))
     if not explicit:
         explicit = _strip_env(getattr(settings, "SPARKPESA_CALLBACK_URL", ""))
     if explicit:
-        return explicit.rstrip("/") + "/"
+        return _ensure_https_url(explicit.rstrip("/") + "/")
     base = _strip_env(getattr(settings, "SITE_URL", "")).rstrip("/")
     if base:
-        return f"{base}/webhooks/sparkpesa/"
+        return _ensure_https_url(f"{base}/webhooks/sparkpesa/")
+    railway = _strip_env(getattr(settings, "RAILWAY_PUBLIC_DOMAIN", ""))
+    if railway:
+        return f"https://{railway}/webhooks/sparkpesa/"
     return ""
+
+
+def validate_sparkpesa_ready() -> str:
+    """Ensure credentials and HTTPS callback are configured before STK push."""
+    _api_key()
+    _api_secret()
+    _wallet_payload()
+    callback = resolve_sparkpesa_webhook_url()
+    if not callback:
+        raise SparkPesaError(
+            "Payment callback URL is not configured. Set SITE_URL or SPARKPESA_CALLBACK_URL on Railway."
+        )
+    if not callback.startswith("https://"):
+        raise SparkPesaError("Payment callback URL must use HTTPS.")
+    return callback
+
+
+def sparkpesa_config_status() -> dict[str, Any]:
+    missing: list[str] = []
+    if not _strip_env(getattr(settings, "SPARKPESA_API_KEY", "")):
+        missing.append("SPARKPESA_API_KEY")
+    if not _strip_env(getattr(settings, "SPARKPESA_API_SECRET", "")):
+        missing.append("SPARKPESA_API_SECRET")
+    if not _wallet_code() and not _wallet_id():
+        missing.append("SPARKPESA_WALLET_CODE or SPARKPESA_WALLET_ID")
+    callback = resolve_sparkpesa_webhook_url()
+    if not callback:
+        missing.append("SITE_URL or SPARKPESA_CALLBACK_URL")
+    return {
+        "configured": len(missing) == 0,
+        "missing": missing,
+        "callback_url": callback,
+        "base_url": _base_url(),
+    }
 
 
 def _amount_for_signature(amount: Any) -> str:
@@ -141,6 +189,37 @@ def _format_sparkpesa_details(details: Any) -> str:
     return str(details)
 
 
+def _normalize_sparkpesa_error(message: str) -> str:
+    msg = str(message or "").strip()
+    prefixes = (
+        "stk push failed:",
+        "mpesa stk push failed:",
+        "m-pesa stk push failed:",
+    )
+    changed = True
+    while changed and msg:
+        changed = False
+        lower = msg.lower()
+        for prefix in prefixes:
+            if lower.startswith(prefix):
+                msg = msg[len(prefix) :].strip()
+                changed = True
+                break
+    if msg.lower() in {"500 internal server error", "internal server error", "500"}:
+        return (
+            "M-Pesa could not start the payment (provider error). "
+            "Confirm SparkPesa wallet is active, amount is at least KES 10, "
+            "and your phone number is correct, then try again."
+        )
+    return msg or "Payment could not be started."
+
+
+def _sanitize_desc(text: str, max_len: int = 50) -> str:
+    cleaned = re.sub(r"[^\w\s\-]", " ", text or "")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return (cleaned or "Ticket payment")[:max_len]
+
+
 def _wallet_payload() -> dict[str, str]:
     wallet_id = _wallet_id()
     wallet_code = _wallet_code()
@@ -154,6 +233,13 @@ def _wallet_payload() -> dict[str, str]:
 def _post(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
     signature, timestamp = _sign_payment_payload(payload)
     url = f"{_base_url()}{endpoint}"
+    safe_log = {
+        k: v
+        for k, v in payload.items()
+        if k not in {"metadata"}
+    }
+    _logger.info("SparkPesa POST %s payload=%s", endpoint, safe_log)
+
     response = requests.post(
         url,
         headers={
@@ -165,16 +251,31 @@ def _post(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
         json=payload,
         timeout=45,
     )
+    raw_text = response.text[:1000]
     try:
         body = response.json()
     except ValueError:
-        body = {"raw": response.text[:500]}
-    if not response.ok:
-        err = body.get("error") or body.get("message") or response.text or f"HTTP {response.status_code}"
+        body = {"raw": raw_text}
+
+    if not response.ok or body.get("success") is False:
+        err = (
+            body.get("error")
+            or body.get("message")
+            or body.get("raw")
+            or raw_text
+            or f"HTTP {response.status_code}"
+        )
         details = body.get("details")
         if details:
             err = f"{err}: {_format_sparkpesa_details(details)}"
+        err = _normalize_sparkpesa_error(str(err))
+        _logger.error(
+            "SparkPesa error status=%s body=%s",
+            response.status_code,
+            json.dumps(body, default=str)[:1000],
+        )
         raise SparkPesaError(err, details=details, status_code=response.status_code)
+
     if not isinstance(body, dict):
         raise SparkPesaError(f"SparkPesa returned unexpected body: {body}")
     return body
@@ -189,9 +290,13 @@ def request_stk_payment(
     callback_url: str = "",
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    account_reference = (account_reference or "").strip()
+    webhook_url = callback_url or validate_sparkpesa_ready()
+
+    account_reference = re.sub(r"[^A-Za-z0-9]", "", (account_reference or "").strip()).upper()
     if not account_reference:
         raise SparkPesaError("accountReference is required for M-Pesa payment.")
+    if len(account_reference) > MPESA_ACCOUNT_REF_MAX:
+        account_reference = account_reference[:MPESA_ACCOUNT_REF_MAX]
 
     amount_int = int(Decimal(amount).to_integral_value())
     if amount_int < 10:
@@ -207,19 +312,18 @@ def request_stk_payment(
         "amount": amount_int,
         "currency": "KES",
         "accountReference": account_reference,
-        "transactionDesc": transaction_desc or f"Ticket {account_reference}"[:100],
+        "transactionDesc": _sanitize_desc(transaction_desc or f"Ticket {account_reference}"),
+        "callbackUrl": _ensure_https_url(webhook_url),
     }
-    webhook_url = callback_url or resolve_sparkpesa_webhook_url()
-    if webhook_url:
-        payload["callbackUrl"] = webhook_url
     if metadata:
-        payload["metadata"] = metadata
+        payload["metadata"] = {str(k): str(v) for k, v in metadata.items()}
 
     body = _post("/payments/request-payment", payload)
     _logger.info(
-        "SparkPesa STK account_ref=%s tx=%s amount=%s",
+        "SparkPesa STK ok account_ref=%s tx=%s amount=%s callback=%s",
         account_reference,
         body.get("transactionId"),
         amount_int,
+        payload["callbackUrl"],
     )
     return body

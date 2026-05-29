@@ -27,6 +27,14 @@ def health(request):
     return JsonResponse({"status": "ok"})
 
 
+def sparkpesa_health(request):
+    from django.http import JsonResponse
+
+    from .sparkpesa import sparkpesa_config_status
+
+    return JsonResponse(sparkpesa_config_status())
+
+
 def _upcoming_events():
     return Event.objects.filter(starts_at__gte=timezone.now()).prefetch_related("ticket_types")
 

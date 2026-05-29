@@ -63,7 +63,7 @@ def initiate_mpesa_payment(ticket, phone, request=None):
     if amount < MIN_MPESA_AMOUNT:
         raise SparkPesaError(f"Minimum M-Pesa amount is KES {MIN_MPESA_AMOUNT}.")
 
-    account_reference = generate_payment_reference("TUK")
+    account_reference = generate_payment_reference("TUK", max_length=12)
     payment = Payment.objects.create(
         ticket=ticket,
         method=Payment.Method.MPESA,
