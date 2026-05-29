@@ -1,16 +1,13 @@
+from django.conf import settings
+
 from .models import SiteSettings
+from .url_helpers import absolute_url
 
 
 def site_settings(request):
     s = SiteSettings.load()
-    logo_url = ""
-    if s.logo:
-        logo_url = request.build_absolute_uri(s.logo.url)
-    favicon_url = ""
-    if s.favicon:
-        favicon_url = request.build_absolute_uri(s.favicon.url)
-    elif logo_url:
-        favicon_url = logo_url
+    logo_url = absolute_url(request, s.logo.url) if s.logo else ""
+    favicon_url = absolute_url(request, s.favicon.url) if s.favicon else logo_url
     og_image = logo_url
     return {
         "site": s,

@@ -140,15 +140,19 @@ def attach_ticket_pdf(ticket):
     )
 
 
+from .url_helpers import _force_https
+
+
 def _absolute_media_url(path):
     if not path:
         return ""
     if path.startswith("http"):
-        return path
+        return _force_https(path)
+    rel = path if path.startswith("/") else f"/{path}"
     base = getattr(settings, "SITE_URL", "").rstrip("/")
     if base:
-        return f"{base}{path}"
-    return path
+        return f"{_force_https(base)}{rel}"
+    return rel
 
 
 def send_ticket_email(ticket_id):

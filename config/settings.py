@@ -72,6 +72,10 @@ RAILWAY_PUBLIC_DOMAIN = config("RAILWAY_PUBLIC_DOMAIN", default="")
 SITE_URL = config("SITE_URL", default="").rstrip("/")
 if not SITE_URL and RAILWAY_PUBLIC_DOMAIN:
     SITE_URL = f"https://{RAILWAY_PUBLIC_DOMAIN.strip()}"
+elif SITE_URL.startswith("http://") and (RAILWAY_PUBLIC_DOMAIN or not DEBUG):
+    SITE_URL = "https://" + SITE_URL[len("http://") :]
+elif SITE_URL and not SITE_URL.startswith("http"):
+    SITE_URL = f"https://{SITE_URL.lstrip('/')}"
 
 ALLOWED_HOSTS = _csv_hosts(config("ALLOWED_HOSTS", default="127.0.0.1,localhost"))
 if "*" in ALLOWED_HOSTS:
@@ -223,7 +227,11 @@ STORAGES = {
 }
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+_volume_mount = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "").strip()
+if _volume_mount:
+    MEDIA_ROOT = Path(_volume_mount)
+else:
+    MEDIA_ROOT = Path(config("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 
 LOGIN_URL = "portal_login"
 LOGIN_REDIRECT_URL = "portal_dashboard"
@@ -254,8 +262,11 @@ if not SPARKPESA_WEBHOOK_URL and SPARKPESA_CALLBACK_URL:
     SPARKPESA_WEBHOOK_URL = SPARKPESA_CALLBACK_URL
 
 # Production / Railway
-if not DEBUG:
+if RAILWAY_PUBLIC_DOMAIN or not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    USE_X_FORWARDED_HOST = True
+
+if not DEBUG:
     SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

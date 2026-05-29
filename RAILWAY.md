@@ -57,16 +57,36 @@ Health check path: `/health/`
    railway run python manage.py createsuperuser
    ```
 
-## 6. Media uploads (important)
+## 6. Persistent media (Railway Volume)
 
-Uploaded files (logos, posters, tickets) are stored on the **container disk**, which is ephemeral on redeploy.
+Uploaded files (logos, posters, tickets) are **not** in Git. Without a volume, they are wiped on every deploy.
 
-For production, plan one of:
+### Where to create a volume (not under Settings)
 
-- Railway **Volume** mounted at `/app/media`
-- Object storage (S3 / Cloudflare R2) with `django-storages`
+Railway moved volumes out of the service Settings tab. Use either:
 
-Until then, re-upload site assets after redeploys if needed.
+1. **Command Palette:** open your project → press **`Ctrl+K`** (Windows) or **`Cmd+K`** (Mac) → type **“Volume”** → **Create Volume**.
+2. **Project canvas:** **right‑click** empty space on the architecture view → add a volume.
+3. **CLI:** `railway volume add --mount-path /app/media`
+
+When prompted:
+
+- **Service:** your web app (not Postgres)
+- **Mount path:** `/app/media` (matches Django `MEDIA_ROOT`)
+
+Railway injects `RAILWAY_VOLUME_MOUNT_PATH` at runtime; the app uses that automatically.
+
+**Notes:**
+
+- Volumes mount when the **container starts**, not during build/pre-deploy.
+- After attaching the volume, **re-upload** logos/posters once on production.
+- Free plan: **1 volume per project**.
+
+### HTTPS / favicon
+
+Set `SITE_URL=https://your-app.up.railway.app` (with **https**). The app forces HTTPS for logo/favicon/OG URLs on Railway.
+
+Ensure `DEBUG=False` in production variables.
 
 ## 7. Local production smoke test
 
