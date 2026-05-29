@@ -54,8 +54,8 @@ def attach_qr(ticket):
     ticket.qr_image.save(f"ticket-{ticket.ticket_id}.png", ContentFile(stream.getvalue()), save=False)
 
 
-def attach_ticket_pdf(ticket):
-    """Single ticket PDF with embedded QR code (used as the only email attachment)."""
+def render_ticket_pdf_bytes(ticket) -> bytes:
+    """Build ticket PDF in memory (reliable for email; no media file required)."""
     if not ticket.qr_token:
         ticket.qr_token = build_qr_payload(ticket)
 
@@ -137,10 +137,15 @@ def attach_ticket_pdf(ticket):
 
     c.showPage()
     c.save()
-    pdf_stream.seek(0)
+    return pdf_stream.getvalue()
+
+
+def attach_ticket_pdf(ticket):
+    """Save ticket PDF to storage (portal/download)."""
+    data = render_ticket_pdf_bytes(ticket)
     ticket.pdf_ticket.save(
         f"ticket-{ticket.ticket_id}.pdf",
-        ContentFile(pdf_stream.read()),
+        ContentFile(data),
         save=False,
     )
 
@@ -160,28 +165,56 @@ def _absolute_media_url(path):
     return rel
 
 
+def _ticket_pdf_bytes(ticket) -> bytes:
+    """PDF bytes for attachment; reads saved file or builds in memory."""
+    if ticket.pdf_ticket:
+        try:
+            with ticket.pdf_ticket.open("rb") as pdf_file:
+                return pdf_file.read()
+        except OSError:
+            _logger.warning(
+                "Could not read PDF for ticket %s; regenerating in memory",
+                ticket.ticket_id,
+            )
+    return render_ticket_pdf_bytes(ticket)
+
+
 def send_ticket_email(ticket_id):
     from .models import SiteSettings, Ticket
 
-    ticket = (
-        Ticket.objects.select_related("event", "ticket_type")
-        .get(pk=ticket_id)
-    )
+    if not getattr(settings, "EMAIL_HOST_USER", ""):
+        _logger.error(
+            "EMAIL_HOST_USER is not set; cannot send ticket email for ticket pk=%s",
+            ticket_id,
+        )
+        return False
+
+    ticket = Ticket.objects.select_related("event", "ticket_type").get(pk=ticket_id)
     if not ticket.attendee_email:
         _logger.warning("No email on ticket %s", ticket.ticket_id)
         return False
 
-    if not ticket.pdf_ticket:
-        if not ticket.qr_token:
-            ticket.qr_token = build_qr_payload(ticket)
+    update_fields = []
+    if not ticket.qr_token:
+        ticket.qr_token = build_qr_payload(ticket)
+        update_fields.append("qr_token")
+    if not ticket.qr_image:
         attach_qr(ticket)
+        update_fields.append("qr_image")
+    if not ticket.pdf_ticket:
         attach_ticket_pdf(ticket)
-        ticket.save(update_fields=["qr_token", "qr_image", "pdf_ticket"])
+        update_fields.append("pdf_ticket")
+    if update_fields:
+        ticket.save(update_fields=update_fields)
 
+    pdf_bytes = _ticket_pdf_bytes(ticket)
     site = SiteSettings.load()
     poster_url = ""
     if ticket.event.poster:
-        poster_url = _absolute_media_url(ticket.event.poster.url)
+        try:
+            poster_url = _absolute_media_url(ticket.event.poster.url)
+        except (ValueError, OSError):
+            poster_url = ""
 
     context = {"ticket": ticket, "site": site, "poster_url": poster_url}
     html_body = render_to_string("emails/ticket_confirmation.html", context)
@@ -199,22 +232,24 @@ def send_ticket_email(ticket_id):
         subject=f"Your ticket for {ticket.event.title}",
         body=text_body,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[ticket.attendee_email],
+        to=[ticket.attendee_email.strip()],
     )
     email.attach_alternative(html_body, "text/html")
-
-    if ticket.pdf_ticket:
-        with ticket.pdf_ticket.open("rb") as pdf_file:
-            email.attach(
-                f"TurnUpKenya-Ticket-{ticket.ticket_id}.pdf",
-                pdf_file.read(),
-                "application/pdf",
-            )
+    email.attach(
+        f"TurnUpKenya-Ticket-{ticket.ticket_id}.pdf",
+        pdf_bytes,
+        "application/pdf",
+    )
 
     try:
         email.send(fail_silently=False)
         _logger.info("Ticket email sent to %s for %s", ticket.attendee_email, ticket.ticket_id)
         return True
     except Exception:
-        _logger.exception("Failed to send ticket email to %s", ticket.attendee_email)
+        _logger.exception(
+            "Failed to send ticket email to %s (host=%s user=%s)",
+            ticket.attendee_email,
+            getattr(settings, "EMAIL_HOST", ""),
+            getattr(settings, "EMAIL_HOST_USER", ""),
+        )
         return False

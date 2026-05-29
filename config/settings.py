@@ -237,17 +237,22 @@ LOGIN_URL = "portal_login"
 LOGIN_REDIRECT_URL = "portal_dashboard"
 LOGOUT_REDIRECT_URL = "home"
 
-EMAIL_BACKEND = config(
-    "EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
+def _env_str(key, default=""):
+    return str(config(key, default=default) or "").strip().strip('"').strip("'")
+
+
+EMAIL_BACKEND = _env_str(
+    "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
 )
-EMAIL_HOST = config("EMAIL_HOST", default="das126.truehost.cloud")
+EMAIL_HOST = _env_str("EMAIL_HOST", "das126.truehost.cloud")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
-EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER or "info@turnupkenya.top")
-ADMIN_EMAIL = config("ADMIN_EMAIL", default=DEFAULT_FROM_EMAIL)
+EMAIL_HOST_USER = _env_str("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = _env_str("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = _env_str("DEFAULT_FROM_EMAIL") or EMAIL_HOST_USER or "info@turnupkenya.top"
+ADMIN_EMAIL = _env_str("ADMIN_EMAIL") or DEFAULT_FROM_EMAIL
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=30, cast=int)
 
 SPARKPESA_API_KEY = config("SPARKPESA_API_KEY", default="")
 SPARKPESA_API_SECRET = config("SPARKPESA_API_SECRET", default="")

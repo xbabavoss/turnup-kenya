@@ -4,6 +4,7 @@ from . import portal_views, views
 urlpatterns = [
     path("health/", views.health, name="health"),
     path("health/sparkpesa/", views.sparkpesa_health, name="sparkpesa_health"),
+    path("health/email/", views.email_health, name="email_health"),
     path("", views.home, name="home"),
     path("events/", views.event_list, name="event_list"),
     path("events/<slug:slug>/", views.event_detail, name="event_detail"),

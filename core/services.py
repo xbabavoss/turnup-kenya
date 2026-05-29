@@ -1,5 +1,7 @@
 import logging
+import time
 from decimal import Decimal
+from typing import Optional
 
 from django.db import OperationalError, transaction
 
@@ -47,15 +49,44 @@ def apply_webhook_refs(payment, event_payload):
     return payment
 
 
-def _schedule_ticket_email(ticket_id: int, payment_id: int):
-    def _send():
-        sent = send_ticket_email(ticket_id)
-        if sent:
-            payment = Payment.objects.get(pk=payment_id)
-            payment.payload = {**payment.payload, "email_sent": True}
-            payment.save(update_fields=["payload", "updated_at"])
+def _mark_email_sent(payment_id: int):
+    payment = Payment.objects.get(pk=payment_id)
+    payment.payload = {**payment.payload, "email_sent": True}
+    payment.save(update_fields=["payload", "updated_at"])
 
-    transaction.on_commit(_send)
+
+def deliver_ticket_email(ticket_id: int, payment_id: Optional[int] = None) -> bool:
+    """Send confirmation email immediately (with one retry)."""
+    for attempt in (1, 2):
+        try:
+            sent = send_ticket_email(ticket_id)
+            if sent and payment_id:
+                _mark_email_sent(payment_id)
+            if sent:
+                return True
+        except Exception:
+            _logger.exception(
+                "Ticket email attempt %s failed for ticket_id=%s",
+                attempt,
+                ticket_id,
+            )
+        if attempt == 1:
+            time.sleep(1)
+    return False
+
+
+def ensure_ticket_email_sent(payment) -> Payment:
+    """Resend ticket email when payment is complete but email was never sent."""
+    payment.refresh_from_db()
+    if payment.status != Payment.Status.COMPLETED:
+        return payment
+    if payment.payload.get("email_sent"):
+        return payment
+    if payment.ticket.status != Ticket.Status.PAID:
+        return payment
+    deliver_ticket_email(payment.ticket_id, payment.pk)
+    payment.refresh_from_db()
+    return payment
 
 
 def sync_payment_status(payment):
@@ -166,7 +197,7 @@ def fulfill_ticket_payment(payment, extra_payload=None):
             payment.payload = {**payment.payload, "webhook": extra_payload}
             payment.save(update_fields=["transaction_ref", "sparkpesa_transaction_id", "payload", "updated_at"])
         if not payment.payload.get("email_sent") and payment.ticket.status == Ticket.Status.PAID:
-            _schedule_ticket_email(payment.ticket_id, payment.pk)
+            deliver_ticket_email(payment.ticket_id, payment.pk)
         return payment
 
     ticket_id = None
@@ -182,8 +213,7 @@ def fulfill_ticket_payment(payment, extra_payload=None):
                 apply_webhook_refs(payment, extra_payload)
                 payment.payload = {**payment.payload, "webhook": extra_payload}
 
-            if payment.status == Payment.Status.COMPLETED:
-                return payment
+            already_completed = payment.status == Payment.Status.COMPLETED
 
             ticket = payment.ticket
             event = ticket.event
@@ -200,27 +230,30 @@ def fulfill_ticket_payment(payment, extra_payload=None):
                     event.status = Event.Status.SOLD_OUT
                 event.save(update_fields=["slots_left", "status", "updated_at"])
 
-            payment.status = Payment.Status.COMPLETED
-            payment.payload = {**payment.payload, "email_sent": False}
-            payment.save(
-                update_fields=[
-                    "status",
-                    "transaction_ref",
-                    "sparkpesa_transaction_id",
-                    "payload",
-                    "updated_at",
-                ]
-            )
+            if not already_completed:
+                payment.status = Payment.Status.COMPLETED
+                payment.payload = {**payment.payload, "email_sent": False}
+                payment.save(
+                    update_fields=[
+                        "status",
+                        "transaction_ref",
+                        "sparkpesa_transaction_id",
+                        "payload",
+                        "updated_at",
+                    ]
+                )
             ticket_id = ticket.pk
     except OperationalError:
         _logger.warning("Database busy fulfilling payment %s", payment.pk)
         payment.refresh_from_db()
         return payment
 
-    if ticket_id:
-        _schedule_ticket_email(ticket_id, payment.pk)
-
     payment.refresh_from_db()
+    if ticket_id and payment.ticket.status == Ticket.Status.PAID:
+        if not payment.payload.get("email_sent"):
+            deliver_ticket_email(ticket_id, payment.pk)
+            payment.refresh_from_db()
+
     return payment
 
 

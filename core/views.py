@@ -17,6 +17,7 @@ from .models import Event, Payment, SiteSettings, Ticket
 from .services import (
     MIN_MPESA_AMOUNT,
     apply_webhook_event,
+    ensure_ticket_email_sent,
     initiate_mpesa_payment,
     sync_payment_status,
 )
@@ -37,6 +38,29 @@ def sparkpesa_health(request):
     from .sparkpesa import sparkpesa_config_status
 
     return JsonResponse(sparkpesa_config_status())
+
+
+def email_health(request):
+    from django.conf import settings
+    from django.http import JsonResponse
+
+    missing = []
+    if not getattr(settings, "EMAIL_HOST", ""):
+        missing.append("EMAIL_HOST")
+    if not getattr(settings, "EMAIL_HOST_USER", ""):
+        missing.append("EMAIL_HOST_USER")
+    if not getattr(settings, "EMAIL_HOST_PASSWORD", ""):
+        missing.append("EMAIL_HOST_PASSWORD")
+    return JsonResponse(
+        {
+            "configured": len(missing) == 0,
+            "missing": missing,
+            "host": getattr(settings, "EMAIL_HOST", ""),
+            "port": getattr(settings, "EMAIL_PORT", ""),
+            "use_tls": getattr(settings, "EMAIL_USE_TLS", False),
+            "from_email": getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+        }
+    )
 
 
 def _upcoming_events():
@@ -239,6 +263,9 @@ def payment_status(request, payment_id):
     payment = get_object_or_404(Payment.objects.select_related("ticket"), pk=payment_id)
     if payment.status == Payment.Status.PENDING:
         payment = sync_payment_status(payment)
+    elif payment.status == Payment.Status.COMPLETED:
+        payment = ensure_ticket_email_sent(payment)
+
     data = {
         "ok": True,
         "payment_id": payment.id,
@@ -252,7 +279,13 @@ def payment_status(request, payment_id):
         data["ok"] = False
         data["error"] = payment.payload.get("error") or "Payment failed. Please try again."
     elif payment.status == Payment.Status.COMPLETED:
-        data["message"] = "Payment successful. Your ticket has been sent to your email."
+        if payment.payload.get("email_sent"):
+            data["message"] = "Payment successful. Your ticket has been sent to your email."
+        else:
+            data["message"] = (
+                "Payment successful. We could not send your ticket email yet — "
+                "we will keep trying. Contact support if it does not arrive."
+            )
     else:
         data["message"] = "Waiting for M-Pesa confirmation…"
     return JsonResponse(data)
