@@ -1,4 +1,5 @@
 import json
+import logging
 from decimal import Decimal
 
 from django.contrib import messages
@@ -17,8 +18,11 @@ from .services import (
     MIN_MPESA_AMOUNT,
     apply_webhook_event,
     initiate_mpesa_payment,
+    sync_payment_status,
 )
 from .sparkpesa import SparkPesaError
+
+_logger = logging.getLogger(__name__)
 
 
 def health(request):
@@ -231,8 +235,10 @@ def quick_purchase(request, slug):
 
 @require_GET
 def payment_status(request, payment_id):
-    """Read payment state from DB (updated by SparkPesa webhook only)."""
+    """Read payment state; syncs with SparkPesa if webhook was missed."""
     payment = get_object_or_404(Payment.objects.select_related("ticket"), pk=payment_id)
+    if payment.status == Payment.Status.PENDING:
+        payment = sync_payment_status(payment)
     data = {
         "ok": True,
         "payment_id": payment.id,
@@ -253,12 +259,31 @@ def payment_status(request, payment_id):
 
 
 @csrf_exempt
-@require_POST
 def sparkpesa_webhook(request):
+    if request.method == "GET":
+        return JsonResponse({"status": "ok", "service": "Turn Up Kenya webhooks"})
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    raw = request.body.decode("utf-8", errors="replace")
+    _logger.info(
+        "SparkPesa webhook POST len=%s content_type=%s",
+        len(raw),
+        request.content_type,
+    )
     try:
-        event = json.loads(request.body.decode())
+        event = json.loads(raw) if raw else {}
     except json.JSONDecodeError:
+        _logger.warning("SparkPesa webhook invalid JSON: %s", raw[:500])
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
+    _logger.info(
+        "SparkPesa webhook event=%s status=%s tx=%s ref=%s",
+        event.get("event"),
+        event.get("status"),
+        event.get("transactionId"),
+        event.get("reference"),
+    )
     apply_webhook_event(event)
     return JsonResponse({"received": True})

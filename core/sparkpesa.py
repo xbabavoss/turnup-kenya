@@ -281,6 +281,165 @@ def _post(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
     return body
 
 
+def _management_get(endpoint: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    timestamp = int(time.time())
+    sig_string = f"{_api_key()}{timestamp}"
+    signature = hmac.new(
+        _api_secret().encode("utf-8"),
+        sig_string.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    url = f"{_base_url()}{endpoint}"
+    response = requests.get(
+        url,
+        headers={
+            "Authorization": f"Bearer {_api_key()}",
+            "X-Signature": signature,
+            "X-Timestamp": str(timestamp),
+        },
+        params=params or {},
+        timeout=30,
+    )
+    try:
+        body = response.json()
+    except ValueError:
+        body = {"raw": response.text[:1000]}
+
+    if not response.ok or body.get("success") is False:
+        err = body.get("error") or body.get("message") or f"HTTP {response.status_code}"
+        _logger.warning("SparkPesa GET %s failed: %s", endpoint, err)
+        raise SparkPesaError(str(err), status_code=response.status_code)
+
+    return body if isinstance(body, dict) else {"data": body}
+
+
+_wallet_uuid_cache: str | None = None
+
+
+def resolve_wallet_uuid() -> str:
+    global _wallet_uuid_cache
+    wallet_id = _wallet_id()
+    if wallet_id:
+        return wallet_id
+    if _wallet_uuid_cache:
+        return _wallet_uuid_cache
+
+    wallet_code = _wallet_code()
+    if not wallet_code:
+        raise SparkPesaError("Missing SPARKPESA_WALLET_CODE or SPARKPESA_WALLET_ID")
+
+    body = _management_get("/wallets")
+    wallets = body.get("wallets") or body.get("data") or []
+    if isinstance(wallets, dict):
+        wallets = wallets.get("items") or wallets.get("wallets") or []
+
+    for wallet in wallets:
+        if not isinstance(wallet, dict):
+            continue
+        code = str(wallet.get("walletCode") or wallet.get("code") or "").strip()
+        if code == wallet_code:
+            uuid = str(wallet.get("id") or wallet.get("walletId") or "").strip()
+            if uuid:
+                _wallet_uuid_cache = uuid
+                return uuid
+
+    raise SparkPesaError(f"Could not resolve wallet UUID for code {wallet_code}")
+
+
+def _extract_transactions(body: dict[str, Any]) -> list[dict[str, Any]]:
+    data = body.get("transactions") or body.get("data") or []
+    if isinstance(data, dict):
+        return data.get("transactions") or data.get("items") or []
+    return data if isinstance(data, list) else []
+
+
+def _tx_matches(
+    tx: dict[str, Any],
+    *,
+    transaction_id: str = "",
+    account_reference: str = "",
+    transaction_ref: str = "",
+) -> bool:
+    tx_id = str(tx.get("transactionId") or tx.get("id") or "").strip()
+    ref = str(tx.get("reference") or "").strip()
+    data = tx.get("data") if isinstance(tx.get("data"), dict) else {}
+    acct = str(
+        tx.get("accountReference")
+        or data.get("accountReference")
+        or tx.get("metadata", {}).get("accountReference")
+        or ""
+    ).strip().upper()
+    acct = re.sub(r"[^A-Za-z0-9]", "", acct).upper()
+
+    if transaction_id and tx_id == transaction_id:
+        return True
+    if transaction_ref and ref and ref == transaction_ref:
+        return True
+    if account_reference and acct and acct == account_reference.upper():
+        return True
+    return False
+
+
+def lookup_payment_transaction(
+    *,
+    transaction_id: str = "",
+    account_reference: str = "",
+    transaction_ref: str = "",
+) -> dict[str, Any] | None:
+    """Find a wallet transaction matching our pending payment."""
+    wallet_uuid = resolve_wallet_uuid()
+    for status_filter in ("completed", "failed", "processing", "pending", ""):
+        params: dict[str, Any] = {"limit": 50, "page": 1}
+        if status_filter:
+            params["status"] = status_filter
+        body = _management_get(f"/wallets/{wallet_uuid}/transactions", params)
+        for tx in _extract_transactions(body):
+            if isinstance(tx, dict) and _tx_matches(
+                tx,
+                transaction_id=transaction_id,
+                account_reference=account_reference,
+                transaction_ref=transaction_ref,
+            ):
+                return tx
+
+    body = _management_get(f"/wallets/{wallet_uuid}")
+    for tx in _extract_transactions(body):
+        if isinstance(tx, dict) and _tx_matches(
+            tx,
+            transaction_id=transaction_id,
+            account_reference=account_reference,
+            transaction_ref=transaction_ref,
+        ):
+            return tx
+    return None
+
+
+def transaction_to_webhook_event(tx: dict[str, Any]) -> dict[str, Any]:
+    data = tx.get("data") if isinstance(tx.get("data"), dict) else {}
+    status = str(tx.get("status") or "").strip().lower()
+    event = "payment.completed" if status == "completed" else "payment.failed"
+    return {
+        "event": event,
+        "status": status,
+        "transactionId": tx.get("transactionId") or tx.get("id"),
+        "reference": tx.get("reference"),
+        "amount": tx.get("amount"),
+        "currency": tx.get("currency") or "KES",
+        "data": {
+            **data,
+            "accountReference": (
+                data.get("accountReference")
+                or tx.get("accountReference")
+            ),
+            "mpesaReceiptNumber": (
+                data.get("mpesaReceiptNumber")
+                or tx.get("mpesaReceiptNumber")
+            ),
+            "resultDesc": data.get("resultDesc") or tx.get("resultDesc"),
+        },
+    }
+
+
 def request_stk_payment(
     *,
     phone_number: str,

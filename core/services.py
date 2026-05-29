@@ -58,6 +58,44 @@ def _schedule_ticket_email(ticket_id: int, payment_id: int):
     transaction.on_commit(_send)
 
 
+def sync_payment_status(payment):
+    """Reconcile pending payments when SparkPesa webhook was missed."""
+    payment.refresh_from_db()
+    if payment.status != Payment.Status.PENDING:
+        return payment
+
+    from .sparkpesa import (
+        SparkPesaError,
+        lookup_payment_transaction,
+        transaction_to_webhook_event,
+    )
+
+    try:
+        tx = lookup_payment_transaction(
+            transaction_id=payment.sparkpesa_transaction_id,
+            account_reference=payment.account_reference,
+            transaction_ref=payment.transaction_ref,
+        )
+    except SparkPesaError as exc:
+        _logger.warning("SparkPesa sync failed for payment %s: %s", payment.pk, exc)
+        return payment
+
+    if not tx:
+        return payment
+
+    status = str(tx.get("status") or "").strip().lower()
+    if status == "completed":
+        return apply_webhook_event(transaction_to_webhook_event(tx))
+    if status in {"failed", "cancelled"}:
+        data = tx.get("data") if isinstance(tx.get("data"), dict) else {}
+        reason = data.get("resultDesc") or tx.get("resultDesc") or "Payment was not completed."
+        mark_payment_failed(payment, reason, extra=transaction_to_webhook_event(tx))
+        payment.refresh_from_db()
+        return payment
+
+    return payment
+
+
 def initiate_mpesa_payment(ticket, phone, request=None):
     amount = Decimal(ticket.total_price)
     if amount < MIN_MPESA_AMOUNT:
@@ -218,17 +256,26 @@ def apply_webhook_event(event_payload: dict):
     event = str(event_payload.get("event") or "").strip().lower()
     status = str(event_payload.get("status") or "").strip().lower()
 
+    completed = event == "payment.completed" or status == "completed"
+    failed = event == "payment.failed" or status in {"failed", "cancelled"}
+
     try:
-        if event == "payment.completed" or status == "completed":
+        if completed:
             return fulfill_ticket_payment(payment, extra_payload=event_payload)
-        if event == "payment.failed" or status == "failed":
-            reason = data.get("resultDesc") or "Payment was not completed."
+        if failed:
+            reason = data.get("resultDesc") or event_payload.get("message") or "Payment was not completed."
             mark_payment_failed(payment, reason, extra=event_payload)
             return payment
     except OperationalError:
         _logger.warning("Database busy processing webhook for payment %s", payment.pk)
         return payment
 
+    _logger.info(
+        "SparkPesa webhook ignored for payment %s event=%s status=%s",
+        payment.pk,
+        event or "(none)",
+        status or "(none)",
+    )
     return payment
 
 
