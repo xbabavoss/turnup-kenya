@@ -22,7 +22,9 @@ In the **web service** → **Variables**, set (see `.env.railway.example`):
 | `SITE_URL` | Yes | `https://<your-app>.up.railway.app` after deploy |
 | `ALLOWED_HOSTS` | Yes | Same hostname without `https://` |
 | `CSRF_TRUSTED_ORIGINS` | Yes | Full `https://` URL |
-| `EMAIL_*` | Yes | SMTP for ticket emails |
+| `RESEND_API_KEY` | Yes (prod) | [Resend](https://resend.com) — SMTP is blocked from Railway |
+| `RESEND_FROM_EMAIL` | Yes | e.g. `Turn Up Kenya <tickets@turnupkenya.top>` after domain verify |
+| `EMAIL_*` | Optional | SMTP fallback (local dev only; times out on Railway) |
 | `SPARKPESA_*` | Yes | M-Pesa credentials |
 | `SPARKPESA_CALLBACK_URL` | Recommended | `{SITE_URL}/webhooks/sparkpesa/` |
 | `DJANGO_SUPERUSER_USERNAME` | Yes | Portal login username |

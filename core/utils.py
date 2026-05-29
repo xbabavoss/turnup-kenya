@@ -7,8 +7,9 @@ from uuid import uuid4
 import qrcode
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+
+from .mail_delivery import email_provider_configured, send_ticket_message
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
@@ -182,9 +183,9 @@ def _ticket_pdf_bytes(ticket) -> bytes:
 def send_ticket_email(ticket_id):
     from .models import SiteSettings, Ticket
 
-    if not getattr(settings, "EMAIL_HOST_USER", ""):
+    if not email_provider_configured():
         _logger.error(
-            "EMAIL_HOST_USER is not set; cannot send ticket email for ticket pk=%s",
+            "No email provider configured (set RESEND_API_KEY or SMTP) for ticket pk=%s",
             ticket_id,
         )
         return False
@@ -228,28 +229,12 @@ def send_ticket_email(ticket_id):
         f"Your ticket is attached as a PDF. Show it at the venue.\n"
         f"Ticket ID: {ticket.ticket_id}\n"
     )
-    email = EmailMultiAlternatives(
+    pdf_name = f"TurnUpKenya-Ticket-{ticket.ticket_id}.pdf"
+    return send_ticket_message(
+        to_email=ticket.attendee_email,
         subject=f"Your ticket for {ticket.event.title}",
-        body=text_body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[ticket.attendee_email.strip()],
+        text_body=text_body,
+        html_body=html_body,
+        pdf_filename=pdf_name,
+        pdf_bytes=pdf_bytes,
     )
-    email.attach_alternative(html_body, "text/html")
-    email.attach(
-        f"TurnUpKenya-Ticket-{ticket.ticket_id}.pdf",
-        pdf_bytes,
-        "application/pdf",
-    )
-
-    try:
-        email.send(fail_silently=False)
-        _logger.info("Ticket email sent to %s for %s", ticket.attendee_email, ticket.ticket_id)
-        return True
-    except Exception:
-        _logger.exception(
-            "Failed to send ticket email to %s (host=%s user=%s)",
-            ticket.attendee_email,
-            getattr(settings, "EMAIL_HOST", ""),
-            getattr(settings, "EMAIL_HOST_USER", ""),
-        )
-        return False

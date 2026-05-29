@@ -252,7 +252,11 @@ EMAIL_HOST_USER = _env_str("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = _env_str("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = _env_str("DEFAULT_FROM_EMAIL") or EMAIL_HOST_USER or "info@turnupkenya.top"
 ADMIN_EMAIL = _env_str("ADMIN_EMAIL") or DEFAULT_FROM_EMAIL
-EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=30, cast=int)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=int)
+
+# Resend (recommended on Railway — SMTP ports are often blocked)
+RESEND_API_KEY = _env_str("RESEND_API_KEY")
+RESEND_FROM_EMAIL = _env_str("RESEND_FROM_EMAIL") or DEFAULT_FROM_EMAIL
 
 SPARKPESA_API_KEY = config("SPARKPESA_API_KEY", default="")
 SPARKPESA_API_SECRET = config("SPARKPESA_API_SECRET", default="")

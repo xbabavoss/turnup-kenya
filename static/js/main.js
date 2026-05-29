@@ -128,10 +128,15 @@ function pollPaymentStatus(statusUrl, email) {
 
       if (data.status === "completed") {
         stopPolling();
+        hidePaymentLoading();
+        const addr = email || data.email || "your email";
+        const emailNote = data.email_sent
+          ? `Your ticket PDF has been sent to ${addr}.`
+          : `Your ticket is being emailed to ${addr}. Check spam in a few minutes if it does not arrive.`;
         showPaymentResult({
           success: true,
           title: "Payment successful",
-          message: `Your ticket has been sent to ${email || data.email || "your email"}.`,
+          message: emailNote,
           redirectHome: true,
         });
       } else if (data.status === "failed") {

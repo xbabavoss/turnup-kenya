@@ -44,21 +44,38 @@ def email_health(request):
     from django.conf import settings
     from django.http import JsonResponse
 
+    from .mail_delivery import email_provider_configured
+
+    use_resend = bool(getattr(settings, "RESEND_API_KEY", ""))
     missing = []
-    if not getattr(settings, "EMAIL_HOST", ""):
-        missing.append("EMAIL_HOST")
-    if not getattr(settings, "EMAIL_HOST_USER", ""):
-        missing.append("EMAIL_HOST_USER")
-    if not getattr(settings, "EMAIL_HOST_PASSWORD", ""):
-        missing.append("EMAIL_HOST_PASSWORD")
+    if use_resend:
+        if not getattr(settings, "RESEND_FROM_EMAIL", ""):
+            missing.append("RESEND_FROM_EMAIL")
+    else:
+        if not getattr(settings, "EMAIL_HOST", ""):
+            missing.append("EMAIL_HOST")
+        if not getattr(settings, "EMAIL_HOST_USER", ""):
+            missing.append("EMAIL_HOST_USER")
+        if not getattr(settings, "EMAIL_HOST_PASSWORD", ""):
+            missing.append("EMAIL_HOST_PASSWORD")
     return JsonResponse(
         {
-            "configured": len(missing) == 0,
+            "configured": email_provider_configured() and len(missing) == 0,
+            "provider": "resend" if use_resend else "smtp",
             "missing": missing,
             "host": getattr(settings, "EMAIL_HOST", ""),
             "port": getattr(settings, "EMAIL_PORT", ""),
             "use_tls": getattr(settings, "EMAIL_USE_TLS", False),
-            "from_email": getattr(settings, "DEFAULT_FROM_EMAIL", ""),
+            "from_email": (
+                getattr(settings, "RESEND_FROM_EMAIL", "")
+                if use_resend
+                else getattr(settings, "DEFAULT_FROM_EMAIL", "")
+            ),
+            "railway_note": (
+                "SMTP often times out on Railway. Set RESEND_API_KEY for reliable delivery."
+                if not use_resend
+                else None
+            ),
         }
     )
 
@@ -274,18 +291,13 @@ def payment_status(request, payment_id):
         "status": payment.status,
         "ticket_id": str(payment.ticket.ticket_id),
         "email": payment.ticket.attendee_email,
+        "email_sent": bool(payment.payload.get("email_sent")),
     }
     if payment.status == Payment.Status.FAILED:
         data["ok"] = False
         data["error"] = payment.payload.get("error") or "Payment failed. Please try again."
     elif payment.status == Payment.Status.COMPLETED:
-        if payment.payload.get("email_sent"):
-            data["message"] = "Payment successful. Your ticket has been sent to your email."
-        else:
-            data["message"] = (
-                "Payment successful. We could not send your ticket email yet — "
-                "we will keep trying. Contact support if it does not arrive."
-            )
+        data["message"] = "Payment successful."
     else:
         data["message"] = "Waiting for M-Pesa confirmation…"
     return JsonResponse(data)

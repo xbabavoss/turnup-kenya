@@ -1,9 +1,10 @@
 import logging
-import time
+import threading
 from decimal import Decimal
 from typing import Optional
 
-from django.db import OperationalError, transaction
+from django.db import OperationalError, close_old_connections, transaction
+from django.utils import timezone
 
 from .models import Event, Payment, Ticket
 from .sparkpesa import (
@@ -56,35 +57,55 @@ def _mark_email_sent(payment_id: int):
 
 
 def deliver_ticket_email(ticket_id: int, payment_id: Optional[int] = None) -> bool:
-    """Send confirmation email immediately (with one retry)."""
-    for attempt in (1, 2):
-        try:
-            sent = send_ticket_email(ticket_id)
-            if sent and payment_id:
-                _mark_email_sent(payment_id)
-            if sent:
-                return True
-        except Exception:
-            _logger.exception(
-                "Ticket email attempt %s failed for ticket_id=%s",
-                attempt,
-                ticket_id,
-            )
-        if attempt == 1:
-            time.sleep(1)
-    return False
+    """Send confirmation email (called from background thread only)."""
+    try:
+        sent = send_ticket_email(ticket_id)
+        if sent and payment_id:
+            _mark_email_sent(payment_id)
+        return sent
+    except Exception:
+        _logger.exception("Ticket email failed for ticket_id=%s", ticket_id)
+        return False
+
+
+def _email_worker(ticket_id: int, payment_id: int):
+    close_old_connections()
+    try:
+        deliver_ticket_email(ticket_id, payment_id)
+    finally:
+        close_old_connections()
+
+
+def queue_ticket_email(ticket_id: int, payment_id: int) -> None:
+    """Queue ticket email without blocking the HTTP request."""
+    payment = Payment.objects.get(pk=payment_id)
+    payload = dict(payment.payload or {})
+    if payload.get("email_sent") or payload.get("email_queued"):
+        return
+    payload["email_queued"] = True
+    payload["email_queued_at"] = timezone.now().isoformat()
+    payment.payload = payload
+    payment.save(update_fields=["payload", "updated_at"])
+
+    thread = threading.Thread(
+        target=_email_worker,
+        args=(ticket_id, payment_id),
+        daemon=True,
+        name=f"ticket-email-{payment_id}",
+    )
+    thread.start()
 
 
 def ensure_ticket_email_sent(payment) -> Payment:
-    """Resend ticket email when payment is complete but email was never sent."""
+    """Non-blocking: queue email if payment completed and not yet sent."""
     payment.refresh_from_db()
     if payment.status != Payment.Status.COMPLETED:
         return payment
-    if payment.payload.get("email_sent"):
+    if payment.payload.get("email_sent") or payment.payload.get("email_queued"):
         return payment
     if payment.ticket.status != Ticket.Status.PAID:
         return payment
-    deliver_ticket_email(payment.ticket_id, payment.pk)
+    queue_ticket_email(payment.ticket_id, payment.pk)
     payment.refresh_from_db()
     return payment
 
@@ -197,7 +218,7 @@ def fulfill_ticket_payment(payment, extra_payload=None):
             payment.payload = {**payment.payload, "webhook": extra_payload}
             payment.save(update_fields=["transaction_ref", "sparkpesa_transaction_id", "payload", "updated_at"])
         if not payment.payload.get("email_sent") and payment.ticket.status == Ticket.Status.PAID:
-            deliver_ticket_email(payment.ticket_id, payment.pk)
+            queue_ticket_email(payment.ticket_id, payment.pk)
         return payment
 
     ticket_id = None
@@ -250,8 +271,8 @@ def fulfill_ticket_payment(payment, extra_payload=None):
 
     payment.refresh_from_db()
     if ticket_id and payment.ticket.status == Ticket.Status.PAID:
-        if not payment.payload.get("email_sent"):
-            deliver_ticket_email(ticket_id, payment.pk)
+        if not payment.payload.get("email_sent") and not payment.payload.get("email_queued"):
+            queue_ticket_email(ticket_id, payment.pk)
             payment.refresh_from_db()
 
     return payment
